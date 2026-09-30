@@ -19,21 +19,29 @@ afterEach(() => {
 function makeService(overrides = {}) {
   process.env.SESSION_SECRET = "unit-test-session-secret";
   process.env.PUBLIC_SITE_URL = "https://amonra.example";
-  const state = { created: null, updateQuery: null, updateValues: null, email: null };
+  const state = { created: null, updateQuery: null, updateValues: null, selectedFields: null, email: null };
   const petitions = {
     create: async (data) => {
       state.created = data;
       return { reference: data.reference };
     },
-    findOneAndUpdate: async (query, update) => {
+    findOneAndUpdate: (query, update) => {
       state.updateQuery = query;
       state.updateValues = update;
-      if (overrides.confirmResult !== undefined) return overrides.confirmResult;
       const suppliedHash = createHash("sha256").update(overrides.validConfirmationToken || "").digest("hex");
       const matchesToken = suppliedHash === query.confirmationTokenHash;
       const isUnexpired = query.confirmationExpiresAt.$gt instanceof Date;
-      if (!matchesToken || !isUnexpired || query.status !== "pending_confirmation") return null;
-      return { reference: "AM-0123456789AB", status: update.$set.status };
+      const result = overrides.confirmResult !== undefined
+        ? overrides.confirmResult
+        : matchesToken && isUnexpired && query.status === "pending_confirmation"
+          ? { reference: "AM-0123456789AB", status: update.$set.status }
+          : null;
+      return {
+        select: async (fields) => {
+          state.selectedFields = fields;
+          return result;
+        },
+      };
     },
     findOne: () => ({
       select: async () => overrides.statusPetition || null,
@@ -82,7 +90,7 @@ test("stores a pending request and sends confirmation with a token expiring with
   assert.ok(state.created.confirmationExpiresAt.getTime() > before);
   assert.ok(state.created.confirmationExpiresAt.getTime() <= before + 24 * 60 * 60 * 1000 + 1000);
   assert.match(state.email[2], /vence en 24 horas/u);
-  assert.match(result.trackingToken, /^[A-HJ-NP-Z2-9]{10}$/u);
+  assert.equal(Object.hasOwn(result, "trackingToken"), false);
 });
 
 test("email failure leaves a saved request and reports that confirmation was not sent", async () => {
@@ -98,6 +106,7 @@ test("confirmation consumes a valid pending token exactly once", async () => {
   const { service, state } = makeService({ validConfirmationToken: confirmationToken });
   const result = await service.confirm(confirmationToken);
   assert.equal(result.status, "received");
+  assert.equal(state.selectedFields, "+trackingTokenEncrypted");
   assert.equal(state.updateQuery.status, "pending_confirmation");
   assert.ok(state.updateQuery.confirmationExpiresAt.$gt instanceof Date);
   assert.equal(state.updateValues.$set.status, "received");
