@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { HydratedDocument } from "mongoose";
 
 export type PetitionDocument = HydratedDocument<Petition>;
-export type PetitionStatus = "pending_confirmation" | "received" | "completed" | "cancelled";
+export type PetitionStatus = "pending_confirmation" | "received" | "accepted" | "in_progress" | "completed" | "cancelled";
 
 @Schema({ timestamps: true, versionKey: false })
 export class Petition {
@@ -36,7 +36,7 @@ export class Petition {
   @Prop({ required: true, default: false })
   share: boolean;
 
-  @Prop({ required: true, enum: ["pending_confirmation", "received", "completed", "cancelled"], default: "pending_confirmation", index: true })
+  @Prop({ required: true, enum: ["pending_confirmation", "received", "accepted", "in_progress", "completed", "cancelled"], default: "pending_confirmation", index: true })
   status: PetitionStatus;
 
   @Prop({ select: false })
@@ -47,6 +47,9 @@ export class Petition {
 
   @Prop({ required: true, select: false })
   trackingTokenHash: string;
+
+  @Prop({ select: false })
+  trackingTokenEncrypted?: string;
 
   @Prop()
   confirmedAt?: Date;

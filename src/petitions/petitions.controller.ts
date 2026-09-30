@@ -3,7 +3,6 @@ import {
   ConfirmPetitionDto,
   CreatePetitionDto,
   PetitionStatusDto,
-  ResendConfirmationDto,
 } from "./petition.dto";
 import { PetitionsService } from "./petitions.service";
 
@@ -19,11 +18,6 @@ export class PetitionsController {
   @Post("confirmar")
   confirm(@Body() dto: ConfirmPetitionDto) {
     return this.petitions.confirm(dto.token);
-  }
-
-  @Post("reenviar")
-  resend(@Body() dto: ResendConfirmationDto, @Ip() ip: string) {
-    return this.petitions.resend(dto, ip);
   }
 
   @Post("estado")

@@ -14,7 +14,11 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { Response } from "express";
-import { AdminLoginDto, UpdatePetitionStatusDto } from "../petitions/petition.dto";
+import {
+  AdminLoginDto,
+  UpdatePetitionMessageDto,
+  UpdatePetitionStatusDto,
+} from "../petitions/petition.dto";
 import { PetitionsService } from "../petitions/petitions.service";
 import { AdminAuthService } from "./admin-auth.service";
 import { AdminGuard } from "./admin.guard";
@@ -62,6 +66,15 @@ export class AdminController {
     @Body() dto: UpdatePetitionStatusDto,
   ) {
     return this.petitions.updateStatus(reference, dto.status);
+  }
+
+  @UseGuards(AdminGuard)
+  @Patch("peticiones/:reference/mensaje")
+  updateMessage(
+    @Param("reference") reference: string,
+    @Body() dto: UpdatePetitionMessageDto,
+  ) {
+    return this.petitions.updateMessage(reference, dto.message);
   }
 
   @UseGuards(AdminGuard)

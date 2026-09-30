@@ -16,8 +16,8 @@ function requireConfiguration(name: string): string {
 async function bootstrap() {
   const sessionSecret = requireConfiguration("SESSION_SECRET");
   if (sessionSecret.length < 32) throw new Error("SESSION_SECRET debe tener al menos 32 caracteres.");
-  if (requireConfiguration("ADMIN_PASSWORD").length < 12) {
-    throw new Error("ADMIN_PASSWORD debe tener al menos 12 caracteres.");
+  if (requireConfiguration("ADMIN_PASSWORD").length < 8) {
+    throw new Error("ADMIN_PASSWORD debe tener al menos 8 caracteres.");
   }
   requireConfiguration("MONGODB_URI");
   if (!process.env.EMAIL_SERVICE_API_URL?.trim() && !process.env.EMAIL_SERVICE_URL?.trim()) {

@@ -72,22 +72,6 @@ export class ConfirmPetitionDto {
   token: string;
 }
 
-export class ResendConfirmationDto {
-  @IsString()
-  @Matches(/^AM-[A-F0-9]{12}$/u)
-  reference: string;
-
-  @IsEmail()
-  @MaxLength(254)
-  email: string;
-
-  @IsString()
-  @MinLength(10)
-  @MaxLength(60)
-  @Matches(/^[A-Za-z0-9_-]+$/u)
-  trackingToken: string;
-}
-
 export class PetitionStatusDto {
   @IsString()
   @Matches(/^AM-[A-F0-9]{12}$/u)
@@ -108,6 +92,14 @@ export class AdminLoginDto {
 }
 
 export class UpdatePetitionStatusDto {
-  @IsIn(["received", "completed", "cancelled"])
-  status: "received" | "completed" | "cancelled";
+  @IsIn(["received", "accepted", "in_progress", "completed", "cancelled"])
+  status: "received" | "accepted" | "in_progress" | "completed" | "cancelled";
+}
+
+export class UpdatePetitionMessageDto {
+  @IsString()
+  @MinLength(5)
+  @MaxLength(600)
+  @Matches(/\S/u)
+  message: string;
 }
