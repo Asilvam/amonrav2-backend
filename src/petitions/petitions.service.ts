@@ -185,7 +185,7 @@ export class PetitionsService {
     if (!statuses.includes(status)) throw new BadRequestException("Filtro de estado inválido.");
     const filter = status === "all" ? {} : { status };
     return this.petitions.find(filter)
-      .select("reference kind duration candleColor candleType message name email share status createdAt confirmedAt updatedAt")
+      .select("reference kind duration candleColor candleType message name phone email share status createdAt confirmedAt updatedAt")
       .sort({ createdAt: -1 })
       .limit(250)
       .lean();
@@ -200,6 +200,15 @@ export class PetitionsService {
     ).select("reference status updatedAt");
     if (!petition) throw new NotFoundException("No encontramos una petición confirmada con esa referencia.");
     return petition;
+  }
+
+  async deletePetition(reference: string) {
+    const petition = await this.petitions.findOneAndDelete({
+      reference: reference.toUpperCase(),
+    }).select("reference");
+    if (!petition) throw new NotFoundException("No encontramos una petición con esa referencia.");
+    this.logger.warn(`Petition permanently deleted (reference=${petition.reference}).`);
+    return { deleted: true, reference: petition.reference };
   }
 
   private async sendConfirmation(email: string, reference: string, confirmationToken: string, trackingToken: string) {

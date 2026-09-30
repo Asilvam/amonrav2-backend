@@ -24,8 +24,11 @@ export class Petition {
   @Prop({ required: true, maxlength: 600 })
   message: string;
 
-  @Prop({ maxlength: 80 })
-  name?: string;
+  @Prop({ required: true, trim: true, maxlength: 80 })
+  name: string;
+
+  @Prop({ trim: true, maxlength: 30 })
+  phone?: string;
 
   @Prop({ required: true, lowercase: true, trim: true, maxlength: 254 })
   email: string;

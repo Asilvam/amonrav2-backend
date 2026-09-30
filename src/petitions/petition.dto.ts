@@ -37,10 +37,16 @@ export class CreatePetitionDto {
   @MaxLength(600)
   message: string;
 
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/\S/u)
+  name: string;
+
   @IsOptional()
   @IsString()
-  @MaxLength(80)
-  name?: string;
+  @MaxLength(30)
+  phone?: string;
 
   @IsEmail()
   @MaxLength(254)

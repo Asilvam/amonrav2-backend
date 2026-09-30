@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Ip,
@@ -61,6 +62,12 @@ export class AdminController {
     @Body() dto: UpdatePetitionStatusDto,
   ) {
     return this.petitions.updateStatus(reference, dto.status);
+  }
+
+  @UseGuards(AdminGuard)
+  @Delete("peticiones/:reference")
+  remove(@Param("reference") reference: string) {
+    return this.petitions.deletePetition(reference);
   }
 }
 
