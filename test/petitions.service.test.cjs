@@ -19,11 +19,24 @@ afterEach(() => {
 function makeService(overrides = {}) {
   process.env.SESSION_SECRET = "unit-test-session-secret";
   process.env.PUBLIC_SITE_URL = "https://amonra.example";
-  const state = { created: null, updateQuery: null, updateValues: null, selectedFields: null, email: null };
+  const state = {
+    created: null,
+    updateQuery: null,
+    updateValues: null,
+    selectedFields: null,
+    expirationQuery: null,
+    expirationUpdate: null,
+    email: null,
+  };
   const petitions = {
     create: async (data) => {
       state.created = data;
       return { reference: data.reference };
+    },
+    updateMany: async (query, update) => {
+      state.expirationQuery = query;
+      state.expirationUpdate = update;
+      return { modifiedCount: overrides.expiredCount || 0 };
     },
     findOneAndUpdate: (query, update) => {
       state.updateQuery = query;
@@ -62,7 +75,10 @@ function makeService(overrides = {}) {
       return overrides.emailResult ?? true;
     },
   };
-  return { service: new PetitionsService(petitions, rateLimits, emails), state };
+  const blockedContacts = overrides.blockedContacts || {
+    exists: async () => false,
+  };
+  return { service: new PetitionsService(petitions, rateLimits, emails, blockedContacts), state };
 }
 
 const requestDto = {
@@ -99,6 +115,31 @@ test("email failure leaves a saved request and reports that confirmation was not
   assert.ok(state.created);
   assert.equal(state.created.status, "pending_confirmation");
   assert.equal(result.confirmationSent, false);
+});
+
+test("archives pending requests whose confirmation window has expired", async () => {
+  const { service, state } = makeService({ expiredCount: 2 });
+
+  await service.list("all");
+
+  assert.equal(state.expirationQuery.status, "pending_confirmation");
+  assert.ok(state.expirationQuery.confirmationExpiresAt.$lte instanceof Date);
+  assert.equal(state.expirationUpdate.$set.status, "expired");
+  assert.ok(state.expirationUpdate.$unset.confirmationTokenHash);
+  assert.ok(state.expirationUpdate.$unset.confirmationExpiresAt);
+});
+
+test("rejects a new request when its email is blocked", async () => {
+  const blockedContacts = {
+    exists: async (query) => query.type === "email" && query.normalizedValue === "ana@example.test",
+  };
+  const { service, state } = makeService({ blockedContacts });
+
+  await assert.rejects(
+    () => service.create(requestDto, "127.0.0.1"),
+    BadRequestException,
+  );
+  assert.equal(state.created, null);
 });
 
 test("confirmation consumes a valid pending token exactly once", async () => {

@@ -103,3 +103,19 @@ export class UpdatePetitionMessageDto {
   @Matches(/\S/u)
   message: string;
 }
+
+export class BlockContactDto {
+  @IsIn(["email", "phone"])
+  type: "email" | "phone";
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(254)
+  @Matches(/[0-9A-Za-z@+]/u)
+  value: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
