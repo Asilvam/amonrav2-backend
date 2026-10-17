@@ -27,6 +27,12 @@ export class Petition {
   @Prop({ required: true, trim: true, maxlength: 80 })
   name: string;
 
+  @Prop({ required: true, trim: true, maxlength: 80 })
+  country: string;
+
+  @Prop({ required: true, trim: true, maxlength: 80 })
+  city: string;
+
   @Prop({ trim: true, maxlength: 30 })
   phone?: string;
 

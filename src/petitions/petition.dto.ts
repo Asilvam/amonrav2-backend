@@ -43,6 +43,18 @@ export class CreatePetitionDto {
   @Matches(/\S/u)
   name: string;
 
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/\S/u)
+  country: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/\S/u)
+  city: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(30)

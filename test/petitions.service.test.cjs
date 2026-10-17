@@ -7,6 +7,7 @@ const { PetitionsService } = require("../dist/petitions/petitions.service.js");
 const savedEnv = {
   SESSION_SECRET: process.env.SESSION_SECRET,
   PUBLIC_SITE_URL: process.env.PUBLIC_SITE_URL,
+  PETITIONS_NOTIFY_TO: process.env.PETITIONS_NOTIFY_TO,
 };
 
 afterEach(() => {
@@ -19,6 +20,7 @@ afterEach(() => {
 function makeService(overrides = {}) {
   process.env.SESSION_SECRET = "unit-test-session-secret";
   process.env.PUBLIC_SITE_URL = "https://amonra.example";
+  process.env.PETITIONS_NOTIFY_TO = "info@amonra.cl,alesoft.silva.m@gmail.com";
   const state = {
     created: null,
     updateQuery: null,
@@ -27,6 +29,7 @@ function makeService(overrides = {}) {
     expirationQuery: null,
     expirationUpdate: null,
     email: null,
+    emails: [],
   };
   const petitions = {
     create: async (data) => {
@@ -41,14 +44,19 @@ function makeService(overrides = {}) {
     findOneAndUpdate: (query, update) => {
       state.updateQuery = query;
       state.updateValues = update;
-      const suppliedHash = createHash("sha256").update(overrides.validConfirmationToken || "").digest("hex");
+      const suppliedHash = createHash("sha256")
+        .update(overrides.validConfirmationToken || "")
+        .digest("hex");
       const matchesToken = suppliedHash === query.confirmationTokenHash;
       const isUnexpired = query.confirmationExpiresAt.$gt instanceof Date;
-      const result = overrides.confirmResult !== undefined
-        ? overrides.confirmResult
-        : matchesToken && isUnexpired && query.status === "pending_confirmation"
-          ? { reference: "AM-0123456789AB", status: update.$set.status }
-          : null;
+      const result =
+        overrides.confirmResult !== undefined
+          ? overrides.confirmResult
+          : matchesToken &&
+              isUnexpired &&
+              query.status === "pending_confirmation"
+            ? { reference: "AM-0123456789AB", status: update.$set.status }
+            : null;
       return {
         select: async (fields) => {
           state.selectedFields = fields;
@@ -60,9 +68,15 @@ function makeService(overrides = {}) {
       select: async () => overrides.statusPetition || null,
     }),
     find: () => ({
-      select() { return this; },
-      sort() { return this; },
-      limit() { return this; },
+      select() {
+        return this;
+      },
+      sort() {
+        return this;
+      },
+      limit() {
+        return this;
+      },
       lean: async () => [],
     }),
   };
@@ -72,13 +86,22 @@ function makeService(overrides = {}) {
   const emails = {
     send: async (...args) => {
       state.email = args;
+      state.emails.push(args);
       return overrides.emailResult ?? true;
     },
   };
   const blockedContacts = overrides.blockedContacts || {
     exists: async () => false,
   };
-  return { service: new PetitionsService(petitions, rateLimits, emails, blockedContacts), state };
+  return {
+    service: new PetitionsService(
+      petitions,
+      rateLimits,
+      emails,
+      blockedContacts,
+    ),
+    state,
+  };
 }
 
 const requestDto = {
@@ -86,6 +109,8 @@ const requestDto = {
   duration: "Una semana",
   message: "Por la salud de mi familia",
   name: "Ana",
+  country: "Chile",
+  city: "Santiago",
   email: " ANA@example.test ",
   share: false,
   consent: true,
@@ -100,12 +125,25 @@ test("stores a pending request and sends confirmation with a token expiring with
   assert.equal(result.confirmationSent, true);
   assert.equal(state.created.status, "pending_confirmation");
   assert.equal(state.created.email, "ana@example.test");
+  assert.equal(state.created.country, "Chile");
+  assert.equal(state.created.city, "Santiago");
   assert.equal(state.created.share, false);
   assert.equal(state.created.confirmationTokenHash.length, 64);
   assert.equal(state.created.trackingTokenHash.length, 64);
   assert.ok(state.created.confirmationExpiresAt.getTime() > before);
-  assert.ok(state.created.confirmationExpiresAt.getTime() <= before + 24 * 60 * 60 * 1000 + 1000);
-  assert.match(state.email[2], /vence en 24 horas/u);
+  assert.ok(
+    state.created.confirmationExpiresAt.getTime() <=
+      before + 24 * 60 * 60 * 1000 + 1000,
+  );
+  assert.equal(state.emails.length, 3);
+  assert.equal(state.emails[0][0], "ana@example.test");
+  assert.equal(state.emails[1][0], "info@amonra.cl");
+  assert.equal(state.emails[2][0], "alesoft.silva.m@gmail.com");
+  assert.match(state.emails[0][2], /vence en 24 horas/u);
+  assert.match(state.emails[1][2], /País: Chile/u);
+  assert.match(state.emails[1][2], /Ciudad: Santiago/u);
+  assert.match(state.emails[2][2], /País: Chile/u);
+  assert.match(state.emails[2][2], /Ciudad: Santiago/u);
   assert.equal(Object.hasOwn(result, "trackingToken"), false);
 });
 
@@ -131,7 +169,8 @@ test("archives pending requests whose confirmation window has expired", async ()
 
 test("rejects a new request when its email is blocked", async () => {
   const blockedContacts = {
-    exists: async (query) => query.type === "email" && query.normalizedValue === "ana@example.test",
+    exists: async (query) =>
+      query.type === "email" && query.normalizedValue === "ana@example.test",
   };
   const { service, state } = makeService({ blockedContacts });
 
@@ -144,7 +183,9 @@ test("rejects a new request when its email is blocked", async () => {
 
 test("confirmation consumes a valid pending token exactly once", async () => {
   const confirmationToken = "a".repeat(43);
-  const { service, state } = makeService({ validConfirmationToken: confirmationToken });
+  const { service, state } = makeService({
+    validConfirmationToken: confirmationToken,
+  });
   const result = await service.confirm(confirmationToken);
   assert.equal(result.status, "received");
   assert.equal(state.selectedFields, "+trackingTokenEncrypted");
@@ -156,12 +197,18 @@ test("confirmation consumes a valid pending token exactly once", async () => {
 
 test("rejects expired, unknown, or already-consumed confirmation tokens", async () => {
   const { service } = makeService({ validConfirmationToken: "a".repeat(43) });
-  await assert.rejects(() => service.confirm("b".repeat(43)), BadRequestException);
+  await assert.rejects(
+    () => service.confirm("b".repeat(43)),
+    BadRequestException,
+  );
 });
 
 test("public status lookup returns status and dates only when the tracking token matches", async () => {
   const trackingToken = "c".repeat(43);
-  const digest = require("node:crypto").createHash("sha256").update(trackingToken).digest("hex");
+  const digest = require("node:crypto")
+    .createHash("sha256")
+    .update(trackingToken)
+    .digest("hex");
   const createdAt = new Date("2026-01-02T03:04:05Z");
   const updatedAt = new Date("2026-01-03T03:04:05Z");
   const { service } = makeService({
