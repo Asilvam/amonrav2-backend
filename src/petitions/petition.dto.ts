@@ -43,6 +43,18 @@ export class CreatePetitionDto {
   @Matches(/\S/u)
   name: string;
 
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/\S/u)
+  country: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/\S/u)
+  city: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(30)
@@ -102,4 +114,20 @@ export class UpdatePetitionMessageDto {
   @MaxLength(600)
   @Matches(/\S/u)
   message: string;
+}
+
+export class BlockContactDto {
+  @IsIn(["email", "phone"])
+  type: "email" | "phone";
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(254)
+  @Matches(/[0-9A-Za-z@+]/u)
+  value: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
 }

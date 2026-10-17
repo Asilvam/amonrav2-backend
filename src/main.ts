@@ -1,6 +1,6 @@
 import "dotenv/config";
 import "reflect-metadata";
-import { ValidationPipe } from "@nestjs/common";
+import { RequestMethod, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { randomUUID } from "node:crypto";
 import { Logger } from "@nestjs/common";
@@ -39,7 +39,9 @@ async function bootstrap() {
     });
     next();
   });
-  app.setGlobalPrefix("api");
+  app.setGlobalPrefix("api", {
+    exclude: [{ path: "", method: RequestMethod.GET }],
+  });
   app.enableCors({ origin: origins, credentials: true });
   app.useBodyParser("json", { limit: "12kb" });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));

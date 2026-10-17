@@ -16,6 +16,7 @@ import {
 import { Response } from "express";
 import {
   AdminLoginDto,
+  BlockContactDto,
   UpdatePetitionMessageDto,
   UpdatePetitionStatusDto,
 } from "../petitions/petition.dto";
@@ -81,6 +82,25 @@ export class AdminController {
   @Delete("peticiones/:reference")
   remove(@Param("reference") reference: string) {
     return this.petitions.deletePetition(reference);
+  }
+
+  @UseGuards(AdminGuard)
+  @Post("bloqueos")
+  blockContact(@Body() dto: BlockContactDto) {
+    return this.petitions.blockContact(dto);
+  }
+
+  @UseGuards(AdminGuard)
+  @Get("bloqueos")
+  async listBlockedContacts() {
+    const blockedContacts = await this.petitions.listBlockedContacts();
+    return { blockedContacts };
+  }
+
+  @UseGuards(AdminGuard)
+  @Delete("bloqueos/:id")
+  unblockContact(@Param("id") id: string) {
+    return this.petitions.unblockContact(id);
   }
 }
 
