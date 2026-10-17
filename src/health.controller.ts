@@ -1,9 +1,18 @@
 import { Controller, Get } from "@nestjs/common";
 
-@Controller("health")
+@Controller()
 export class HealthController {
   @Get()
+  root() {
+    return this.response();
+  }
+
+  @Get("health")
   check() {
-    return { status: "ok", service: "amonra-petitions-api" };
+    return this.response();
+  }
+
+  private response() {
+    return { status: "ok", message: "Hola mundo", service: "amonra-petitions-api" };
   }
 }
