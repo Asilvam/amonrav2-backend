@@ -61,18 +61,6 @@ export class CreateVelaDto {
   publishLocation: boolean;
 }
 
-export class VelaTrackingDto {
-  @IsString()
-  @Matches(/^V-[A-F0-9]{24}$/u)
-  reference: string;
-
-  @IsString()
-  @MinLength(20)
-  @MaxLength(80)
-  @Matches(/^[A-Za-z0-9_-]+$/u)
-  trackingToken: string;
-}
-
 export class VelaCitiesQueryDto {
   @IsString()
   @IsIn(COUNTRY_CODES)

@@ -35,9 +35,6 @@ export class Vela {
   @Prop({ required: true, default: false })
   publishLocation: boolean;
 
-  @Prop({ required: true, select: false })
-  trackingTokenHash: string;
-
   createdAt: Date;
   updatedAt: Date;
 }

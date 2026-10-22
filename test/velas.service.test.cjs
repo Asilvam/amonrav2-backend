@@ -1,22 +1,13 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
-const { createHash } = require("node:crypto");
 const { VelasService } = require("../dist/velas/velas.service.js");
 
-function makeService({ createdCandle, trackedCandle } = {}) {
-  const state = { created: null, trackQuery: null };
+function makeService({ createdCandle, listedCandles = [] } = {}) {
+  const state = { created: null };
   const velaModel = {
     create: async (value) => {
       state.created = value;
       return createdCandle ?? value;
-    },
-    findOne: (query) => {
-      state.trackQuery = query;
-      return {
-        select: () => ({
-          exec: async () => trackedCandle ?? null,
-        }),
-      };
     },
     find: () => ({
       sort() {
@@ -28,7 +19,7 @@ function makeService({ createdCandle, trackedCandle } = {}) {
       limit() {
         return this;
       },
-      exec: async () => [],
+      exec: async () => listedCandles,
     }),
   };
   const rateLimitModel = {
@@ -50,7 +41,7 @@ const dto = {
   publishLocation: false,
 };
 
-test("creates an independent candle and returns its private tracking token once", async () => {
+test("creates a shared candle and returns no private tracking credential", async () => {
   const { service, state } = makeService();
   const result = await service.create(dto, "127.0.0.1");
 
@@ -58,20 +49,16 @@ test("creates an independent candle and returns its private tracking token once"
   assert.equal(result.candle.intention, dto.intention);
   assert.equal(result.candle.color, dto.color);
   assert.equal(result.candle.publishLocation, false);
-  assert.match(result.trackingToken, /^[A-Za-z0-9_-]{43}$/u);
-  assert.equal(
-    state.created.trackingTokenHash,
-    createHash("sha256").update(result.trackingToken).digest("hex"),
-  );
+  assert.deepEqual(Object.keys(result), ["candle"]);
+  assert.equal(Object.hasOwn(state.created, "trackingTokenHash"), false);
   assert.equal(Object.hasOwn(result.candle, "trackingTokenHash"), false);
   assert.equal(Object.hasOwn(result.candle, "countryCode"), false);
   assert.equal(Object.hasOwn(result.candle, "cityName"), false);
 });
 
-test("never exposes stored location unless publication consent was granted", async () => {
-  const token = "b".repeat(43);
-  const { service } = makeService({
-    trackedCandle: {
+test("lists shared candles and publishes location only with consent", async () => {
+  const candles = [
+    {
       reference: "V-AAAAAAAAAAAAAAAAAAAAAAAA",
       intention: "Calma",
       dedication: "",
@@ -81,50 +68,25 @@ test("never exposes stored location unless publication consent was granted", asy
       countryCode: "CL",
       cityName: "Santiago",
       publishLocation: false,
-      trackingTokenHash: createHash("sha256").update(token).digest("hex"),
     },
-  });
+    {
+      reference: "V-BBBBBBBBBBBBBBBBBBBBBBBB",
+      intention: "Esperanza",
+      dedication: "",
+      name: "",
+      color: "marfil",
+      startedAt: new Date("2026-01-03T03:04:05Z"),
+      countryCode: "CL",
+      cityName: "Valparaíso",
+      publishLocation: true,
+    },
+  ];
+  const { service } = makeService({ listedCandles: candles });
+  const result = await service.list({ limit: 60, skip: 0 });
 
-  const result = await service.track(
-    { reference: "V-AAAAAAAAAAAAAAAAAAAAAAAA", trackingToken: token },
-    "127.0.0.1",
-  );
-
-  assert.equal(Object.hasOwn(result.candle, "countryCode"), false);
-  assert.equal(Object.hasOwn(result.candle, "cityName"), false);
-});
-
-test("returns the public location only for an authorized candle", async () => {
-  const token = "a".repeat(43);
-  const trackingTokenHash = createHash("sha256").update(token).digest("hex");
-  const candle = {
-    reference: "V-AAAAAAAAAAAAAAAAAAAAAAAA",
-    intention: "Calma",
-    dedication: "",
-    name: "",
-    color: "azul",
-    startedAt: new Date("2026-01-02T03:04:05Z"),
-    countryCode: "CL",
-    cityName: "Santiago",
-    publishLocation: true,
-    trackingTokenHash,
-  };
-  const { service, state } = makeService({ trackedCandle: candle });
-  const result = await service.track(
-    { reference: candle.reference, trackingToken: token },
-    "127.0.0.1",
-  );
-
-  assert.deepEqual(result.candle, {
-    id: candle.reference,
-    intention: "Calma",
-    dedication: "",
-    name: "",
-    color: "azul",
-    startedAt: "2026-01-02T03:04:05.000Z",
-    publishLocation: true,
-    countryCode: "CL",
-    cityName: "Santiago",
-  });
-  assert.deepEqual(state.trackQuery, { reference: candle.reference });
+  assert.equal(result.candles.length, 2);
+  assert.equal(Object.hasOwn(result.candles[0], "countryCode"), false);
+  assert.equal(Object.hasOwn(result.candles[0], "cityName"), false);
+  assert.equal(result.candles[1].countryCode, "CL");
+  assert.equal(result.candles[1].cityName, "Valparaíso");
 });

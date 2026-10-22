@@ -4,17 +4,15 @@ import {
   HttpStatus,
   Injectable,
   Logger,
-  NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { Model } from "mongoose";
 import {
   CreateVelaDto,
   VelaCitiesQueryDto,
   VelaListQueryDto,
-  VelaTrackingDto,
 } from "./vela.dto";
 import {
   findVelaCities,
@@ -28,7 +26,6 @@ import { Vela } from "./vela.schema";
 
 const HOUR_MS = 60 * 60 * 1000;
 const CREATE_LIMIT_PER_HOUR = 8;
-const TRACK_LIMIT_PER_HOUR = 30;
 const CITY_SEARCH_LIMIT_PER_HOUR = 120;
 
 export interface PublicVela {
@@ -41,20 +38,6 @@ export interface PublicVela {
   publishLocation: boolean;
   countryCode?: string;
   cityName?: string;
-}
-
-function trackingToken(): string {
-  return randomBytes(32).toString("base64url");
-}
-
-function tokenHash(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function equalHash(provided: string, expectedHash: string): boolean {
-  const actual = Buffer.from(tokenHash(provided), "hex");
-  const expected = Buffer.from(expectedHash, "hex");
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 @Injectable()
@@ -131,9 +114,7 @@ export class VelasService {
         "Selecciona país y ciudad para publicar la ubicación.",
       );
     }
-
     const reference = `V-${randomBytes(12).toString("hex").toUpperCase()}`;
-    const trackingCode = trackingToken();
     const candle = await this.velaModel.create({
       reference,
       intention: dto.intention,
@@ -145,13 +126,9 @@ export class VelasService {
       ...(cityId ? { cityId } : {}),
       ...(cityName ? { cityName } : {}),
       publishLocation: dto.publishLocation,
-      trackingTokenHash: tokenHash(trackingCode),
     });
 
-    return {
-      candle: this.toPublicVela(candle),
-      trackingToken: trackingCode,
-    };
+    return { candle: this.toPublicVela(candle) };
   }
 
   async list(query: VelaListQueryDto) {
@@ -168,25 +145,6 @@ export class VelasService {
       .limit(limit)
       .exec();
     return { candles: candles.map((candle) => this.toPublicVela(candle)) };
-  }
-
-  async track(dto: VelaTrackingDto, ip: string) {
-    await this.enforceRateLimit(ip, "track", TRACK_LIMIT_PER_HOUR);
-    const candle = await this.velaModel
-      .findOne({ reference: dto.reference })
-      .select("+trackingTokenHash")
-      .exec();
-
-    if (
-      !candle ||
-      !candle.trackingTokenHash ||
-      !equalHash(dto.trackingToken, candle.trackingTokenHash)
-    ) {
-      throw new NotFoundException(
-        "No encontramos una vela con esos datos de seguimiento.",
-      );
-    }
-    return { candle: this.toPublicVela(candle) };
   }
 
   private toPublicVela(candle: Vela): PublicVela {
@@ -208,7 +166,7 @@ export class VelasService {
 
   private async enforceRateLimit(
     ip: string,
-    action: "create" | "track" | "search",
+    action: "create" | "search",
     limit: number,
   ): Promise<void> {
     const windowStart = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
