@@ -12,7 +12,6 @@ import {
   CreateVelaDto,
   VelaCitiesQueryDto,
   VelaListQueryDto,
-  VelaTrackingDto,
 } from "./vela.dto";
 import { VelasService } from "./velas.service";
 
@@ -39,10 +38,5 @@ export class VelasController {
   @Get()
   list(@Query() query: VelaListQueryDto) {
     return this.velas.list(query);
-  }
-
-  @Post("seguimiento")
-  track(@Body() dto: VelaTrackingDto, @Ip() ip: string) {
-    return this.velas.track(dto, ip);
   }
 }
