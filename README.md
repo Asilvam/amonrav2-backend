@@ -22,6 +22,7 @@ El API escucha por defecto en `http://localhost:3001/api`. El health check está
 - `WEB_ORIGINS`: orígenes web exactos permitidos, separados por coma. Incluye desarrollo y producción según corresponda.
 - `ADMIN_PASSWORD`: contraseña del único administrador inicial.
 - `SESSION_SECRET`: secreto aleatorio de al menos 32 caracteres para firmar la sesión.
+- `GEONAMES_USERNAME`: usuario de GeoNames para buscar ciudades. Es opcional hasta que se utilice el buscador y solo se configura en el servidor.
 - `PORT`, `NODE_ENV`, `COOKIE_SAME_SITE` y `TRUST_PROXY`: opciones de ejecución. Si API y web tienen dominios distintos, configura `COOKIE_SAME_SITE=none` y usa HTTPS.
 
 El frontend estático se configura durante su build con `PUBLIC_API_BASE_URL` (por ejemplo `http://localhost:3001` o `https://api.tudominio.cl`). Déjalo vacío si un proxy del alojamiento publica la API bajo el mismo origen.
@@ -43,9 +44,18 @@ El frontend estático se configura durante su build con `PUBLIC_API_BASE_URL` (p
 | `POST` | `/api/peticiones/confirmar` | Público, token de confirmación |
 | `POST` | `/api/peticiones/reenviar` | Público, referencia, correo y clave de seguimiento |
 | `POST` | `/api/peticiones/estado` | Público, referencia y clave de seguimiento |
+| `GET` | `/api/velas/ubicaciones/paises` | Público |
+| `GET` | `/api/velas/ubicaciones/ciudades?country=CL&q=santi` | Público, búsqueda acotada por país |
+| `POST` | `/api/velas` | Público, crea una vela y entrega credencial privada de seguimiento |
+| `GET` | `/api/velas?limit=60&skip=0` | Sala pública compartida, con ubicaciones solo bajo consentimiento |
+| `POST` | `/api/velas/seguimiento` | Público, referencia y clave privada de seguimiento |
 | `POST` | `/api/admin/login` | Público, contraseña de administrador |
 | `POST` | `/api/admin/logout` | Sesión de administrador |
 | `GET` | `/api/admin/peticiones?status=all` | Sesión de administrador |
 | `PATCH` | `/api/admin/peticiones/:reference` | Sesión de administrador |
 
 La administración autentica con una cookie `HttpOnly`; ninguna clave privada del backend se entrega al navegador.
+
+## Sala de luz
+
+La persistencia de velas utiliza su propia colección MongoDB, separada del flujo y los modelos de peticiones. El instante de encendido se guarda en UTC; las 48 horas de duración y sus etapas visuales se calculan desde `startedAt`. La referencia pública comienza con `V-`; el token privado de seguimiento solo se entrega al crear la vela y en MongoDB se conserva su hash. Las ubicaciones son opcionales y el listado público solo incluye país/ciudad cuando `publishLocation` es `true`. Las sugerencias de ciudad se consultan a GeoNames desde el servidor, con caché y límite de solicitudes; configura `GEONAMES_USERNAME` para habilitarlas.
