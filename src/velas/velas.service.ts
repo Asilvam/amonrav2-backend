@@ -138,13 +138,26 @@ export class VelasService {
     const skip = Number.isInteger(query.skip)
       ? Math.min(10_000, Math.max(0, query.skip))
       : 0;
-    const candles = await this.velaModel
-      .find()
-      .sort({ startedAt: -1 })
+    const cutoff = new Date(Date.now() - 48 * HOUR_MS);
+    const filter = query.status
+      ? { startedAt: query.status === "active" ? { $gt: cutoff } : { $lte: cutoff } }
+      : {};
+    const candlesQuery = this.velaModel
+      .find(filter)
+      .sort({ startedAt: -1, reference: -1 })
       .skip(skip)
       .limit(limit)
       .exec();
-    return { candles: candles.map((candle) => this.toPublicVela(candle)) };
+    const [candles, total] = await Promise.all([
+      candlesQuery,
+      query.status ? this.velaModel.countDocuments(filter).exec() : Promise.resolve(undefined),
+    ]);
+    return {
+      candles: candles.map((candle) => this.toPublicVela(candle)),
+      ...(total !== undefined
+        ? { pagination: { total, limit, skip, hasMore: skip + candles.length < total } }
+        : {}),
+    };
   }
 
   private toPublicVela(candle: Vela): PublicVela {

@@ -75,6 +75,10 @@ export class VelaCitiesQueryDto {
 
 export class VelaListQueryDto {
   @IsOptional()
+  @IsIn(["active", "extinguished"])
+  status?: "active" | "extinguished";
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
